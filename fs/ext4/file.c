@@ -169,10 +169,10 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     int attributes = 1;
     struct dentry * dent ;
 
-    printk("O_WRONLY = %d O_RDWR=%d \n",O_WRONLY,O_RDWR);
-    printk("Opening with flags %d\n",filp->f_mode);
-    if( filp->f_mode & O_WRONLY || filp->f_mode & O_RDWR)
-        printk("Opening file for write\n\n");
+    //printk("O_WRONLY = %d O_RDWR=%d \n",O_WRONLY,O_RDWR);
+    //printk("Opening with flags %d\n",filp->f_mode);
+    //if( filp->f_mode & O_WRONLY || filp->f_mode & O_RDWR)
+    //    printk("Opening file for write\n\n");
 
     /*
     * Check COW attributes. If Write, flush pages to disk.
@@ -182,7 +182,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         path = filp->f_path;
         dent = (&path)->dentry;
 
-        printk("COW file found %s!\n" , dent->d_iname);
+        //printk("COW file found %s!\n" , dent->d_iname);
     }
 
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
