@@ -197,12 +197,10 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         *it should point to the new copy of the file
         *d_inode should be set to null before calling vfs_create.
         */
-        dentry.d_inode = NULL;
+        dentry->d_inode = NULL;
         created = vfs_create( parentInode, filp->f_path.dentry, filp->f_mode, nd );
         if(!created)
             return -ENOMEM;
-        
-
 
         /*
         * Loop through the pages of old file and copy its pages into the newfile.

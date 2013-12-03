@@ -1,0 +1,3 @@
+LOCAL_MODULE    := hw6
+LOCAL_SRC_FILES := hw6.c
+
