@@ -167,23 +167,63 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	struct path path;
 	char buf[64], *cp;
     int attributes = 1;
-    struct dentry * dent ;
+    struct dentry * dentry ;
+    //struct address_space *to_mapping = filp->f_mapping;
+    struct address_space *from_mapping = inode->i_mapping;
+    //const struct address_space_operations *a_ops = from_mapping->a_ops;
+    //struct page * page;
+    struct inode *newCowInode;
+    int i = 0;
+    //int created = 0;
 
-    printk("O_WRONLY = %d O_RDWR=%d \n",O_WRONLY,O_RDWR);
-    printk("Opening with flags %d\n",filp->f_mode);
-    if( filp->f_mode & O_WRONLY || filp->f_mode & O_RDWR)
-        printk("Opening file for write\n\n");
 
     /*
-    * Check COW attributes. If Write, flush pages to disk.
+    * Check COW attributes. If this a cow file, we need to tranfer the metadata
+    * and the pages in inode (Contained in the address_space object (i_mapping)
+    * to the new file's mappings. Perform this when the file is opened in
+    * a WRONLY or RDWR mode
     */
 
-    if( attributes ){
+    if( attributes && ( filp->f_mode & O_WRONLY || filp->f_mode & O_RDWR)){
         path = filp->f_path;
-        dent = (&path)->dentry;
+        dentry = (&path)->dentry;
 
-        printk("COW file found %s!\n" , dent->d_iname);
+        //Create a new file inode.
+        newCowInode = kmalloc( sizeof (struct inode) , GFP_USER);
+        if( !newCowInode )
+	        return -ENOMEM;
+
+        //Creat medadata to reference the new file?
+        //created = inode->i_op->create( newCowInode, dentry, filp->f_mode, NULL );
+        //if(!created)
+        //    return -ENOMEM;
+
+        //dentry->d_inode = newCowInode;
+
+        //printk("The newly created inode: pages: %lu\n", newCowInode->i_mapping->nrpages);
+
+        /*
+        * Loop through the pages of old file and copy its pages into the newfile.
+        */
+        do{
+            //size_t copied;
+            //unsigned long offset;
+            //unsigned long bytes;
+
+            /*
+            * Get the page the to transfer
+            * Copy as much of the page as we can from the file into page.
+            * Disable page faults make sure copies are atomic.
+            */
+            pagefault_disable();
+            pagefault_enable();
+            i ++;
+        }while( i < from_mapping->nrpages);
+        
+   
+        printk("COW file found %s! num pages %ld\n" ,dentry->d_iname, from_mapping->nrpages);
     }
+    
 
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
 		     !(sb->s_flags & MS_RDONLY))) {
@@ -224,7 +264,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 		spin_unlock(&inode->i_lock);
 		if (unlikely(jinode != NULL))
 			jbd2_free_inode(jinode);
-	}
+   	}
 	return dquot_file_open(inode, filp);
 }
 
