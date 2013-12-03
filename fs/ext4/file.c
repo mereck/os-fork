@@ -172,35 +172,37 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     struct address_space *from_mapping = inode->i_mapping;
     //const struct address_space_operations *a_ops = from_mapping->a_ops;
     //struct page * page;
-    struct inode *newCowInode;
+    struct nameidata *nd = NULL;
+    struct inode *parentInode;
+    struct dentry * parentDentry;
     int i = 0;
-    //int created = 0;
+    int created = 0;
 
+    if( attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
 
-    /*
-    * Check COW attributes. If this a cow file, we need to tranfer the metadata
-    * and the pages in inode (Contained in the address_space object (i_mapping)
-    * to the new file's mappings. Perform this when the file is opened in
-    * a WRONLY or RDWR mode
-    */
-
-    if( attributes && ( filp->f_mode & O_WRONLY || filp->f_mode & O_RDWR)){
         path = filp->f_path;
         dentry = (&path)->dentry;
 
-        //Create a new file inode.
-        newCowInode = kmalloc( sizeof (struct inode) , GFP_USER);
-        if( !newCowInode )
-	        return -ENOMEM;
 
-        //Creat medadata to reference the new file?
-        //created = inode->i_op->create( newCowInode, dentry, filp->f_mode, NULL );
-        //if(!created)
-        //    return -ENOMEM;
+        //Obtain the parent directory. A New inode will be created in this directory.
+        parentDentry  = dentry->d_parent;
+        parentInode = parentDentry->d_inode;
 
-        //dentry->d_inode = newCowInode;
+        
+        printk("COW file found %s! num pages %ld\n" ,dentry->d_iname, from_mapping->nrpages);
 
-        //printk("The newly created inode: pages: %lu\n", newCowInode->i_mapping->nrpages);
+        /*
+        *Create medadata (inode) to reference the new file.
+        *dentry.d_inode points to the old file. After vfs_create,
+        *it should point to the new copy of the file
+        *d_inode should be set to null before calling vfs_create.
+        */
+        dentry.d_inode = NULL;
+        created = vfs_create( parentInode, filp->f_path.dentry, filp->f_mode, nd );
+        if(!created)
+            return -ENOMEM;
+        
+
 
         /*
         * Loop through the pages of old file and copy its pages into the newfile.
@@ -221,7 +223,6 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         }while( i < from_mapping->nrpages);
         
    
-        printk("COW file found %s! num pages %ld\n" ,dentry->d_iname, from_mapping->nrpages);
     }
     
 
