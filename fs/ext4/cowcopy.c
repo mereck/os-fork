@@ -62,19 +62,25 @@ int checkInodeType(struct inode* i){
 	return 0;
 }
 
+int checkDevices(char *s, char *d){
+	return 0;
+}
+
 asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest){
 
 	struct path path;
 	int ret;
 	char buf[100]; //TODO: we need to get this to work with paths that are larger than buffer size
+	char *ksource;
+	char *kdest;
 
-	printk ("**COWCOPY TRIGGERED**\n");
 	ret = copy_from_user(&buf, src, sizeof(buf));
-	printk ("**COWCOPY buffer: %s, ret: %d \n",buf,ret);
+	ksource = buf;
+	printk ("**COWCOPY src: %s\n",ksource);
 
-	kern_path(buf,LOOKUP_FOLLOW,&path);	
+	kern_path(ksource,LOOKUP_FOLLOW,&path);	
 
-	if(checkFsType(path.dentry,buf) == 1)
+	if(checkFsType(path.dentry,ksource) == 1)
 		return 1;
 
 	ret = checkInodeType(path.dentry->d_inode);
@@ -82,6 +88,13 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	if (ret == 2) //src is a directory
 		return -EPERM;
 	else if (ret == 1)
+		return 1;
+
+	ret = copy_from_user(&buf, dest, sizeof(buf));
+	kdest = buf;
+	printk ("**COWCOPY dest: %s**\n",kdest);
+
+	if(checkDevices(ksource,kdest) == 1)
 		return 1;
 
 	return 0;
