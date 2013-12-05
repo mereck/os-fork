@@ -9,9 +9,12 @@
 int checkFsType(struct dentry* d, char *buf){
 	const char *file_system_type;
 	int ret;
+	printk("**COWCOPY checkFsType buf: %s **\n",buf);
 	if (d == NULL){
 		printk("**COWCOPY %s path.dentry is null**\n",buf);
 		return 1;
+	} else {
+		printk("**COWCOPY %s path.dentry is not null**\n",buf);
 	}
 
 	if (d->d_sb == NULL){
@@ -55,7 +58,7 @@ int checkInodeType(struct inode* i){
 	//	return 1;
 	//}
 
-	if(S_ISDIR(i->i_mode)==0){
+	if(S_ISDIR(i->i_mode)==1){
 		printk("**COWCOPY source file is a directory!**\n");
 		return 2;
 	}
@@ -99,16 +102,17 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 	struct path spath, dpath;
 	int ret;
-	char buf[100]; //TODO: we need to get this to work with paths that are larger than buffer size
-	char *ksource;
-	char *kdest;
+	char ksource[100]; //TODO: we need to get this to work with paths that are larger than buffer size
+	char kdest[100];
 	
 	// process source path
-	ret = copy_from_user(&buf, src, sizeof(buf));
-	ksource = buf;
+	ret = copy_from_user(&ksource, src, sizeof(ksource));
 	printk ("**COWCOPY src: %s\n",ksource);
 
-	kern_path(ksource,LOOKUP_FOLLOW,&spath);	
+	ret = kern_path(ksource,LOOKUP_FOLLOW,&spath);	
+
+	printk ("**COWCOPY src kern_path returned %d**\n",ret);
+
 
 	if(checkFsType(spath.dentry,ksource) == 1)
 		return 1;
@@ -121,20 +125,23 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 		return 1;
 
 	// proces destination path
-	ret = copy_from_user(&buf, dest, sizeof(buf));
-	kdest = buf;
+	printk ("**COWCOPY about to copy dest into buffer**\n");
+	ret = copy_from_user(&kdest, dest, sizeof(kdest));
 	printk ("**COWCOPY dest: %s**\n",kdest);
 
-	kern_path(kdest,LOOKUP_FOLLOW,&dpath);
 
-	if(checkFsType(dpath.dentry,kdest) == 1)
-		return 1;
+	//kern_path(kdest,LOOKUP_FOLLOW,&dpath);
 
-	if(checkDevices(ksource,kdest) == 1)
-		return 1;
+	if (dpath.dentry == NULL)
+		printk("**COWCOPY %s: dpath.dentry is null**\n",kdest);
+	else
+		printk("**COWCOPY %s: dpath.dentry is not null**\n",kdest);
 
-	if(createShallowCopy(spath.dentry,dpath.dentry) == 1)
-		return 1;
+	//if(checkDevices(ksource,kdest) == 1)
+	//	return 1;
+
+	//if(createShallowCopy(spath.dentry,dpath.dentry) == 1)
+	//	return 1;
 
 	return 0;
 

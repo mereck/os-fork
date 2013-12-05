@@ -2,10 +2,11 @@
 #include <sys/utsname.h>
 #include "inject.h"
 
-int main() {
-	char *src,dest;
-	src = "reallyLongSource.txt";
-	dest = "dest.txt";
+int main(int argc, char *argv[]) {
+	char *src;
+	char *dest;
+	src = argv[1];
+	dest = argv[2];
     int ret = test_cowcopy(src,dest);
     if (ret != 0) {
         printf("test cowcopy ret: %d\n", ret);
@@ -14,6 +15,8 @@ int main() {
     } else {
 	printf("Launched test_cowcopy with src:%s dest: %s\n",src,dest);
 	}
+
+	return 0;
 
 	src = "..";
 	dest = "dest.txt";
