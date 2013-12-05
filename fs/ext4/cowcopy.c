@@ -5,6 +5,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
+#include <linux/xattr.h>
 
 int checkFsType(struct dentry* d, char *buf){
 	const char *file_system_type;
@@ -71,30 +72,52 @@ int checkDevices(char *s, char *d){
 }
 
 // locks parent dentry, taken from ecryptfs/inode.c
-static struct dentry *lock_parent(struct dentry *dentry){
+/*static struct dentry *lock_parent(struct dentry *dentry){
 	struct dentry *dir;
 	dir = dget_parent(dentry);
 	mutex_lock_nested(&(dir->d_inode->i_mutex), I_MUTEX_PARENT);
 	return dir;
 }
-
+*/
 int createShallowCopy(struct dentry *s, struct dentry *d){
 	
-	struct dentry *dir;
 	int ret;
-	dget(s);
-	dget(d);
-	dir = lock_parent(d);
-	ret = vfs_link(s,dir->d_inode,d); //create hardlink
-	if (ret || !s->d_inode){
-		mutex_unlock(&dir->d_inode->i_mutex);
-		dput(dir);
-		dput(s);
-		dput(d);
+	struct inode * i;
+	struct dentry * p;
+	p = d->d_parent;
+	i = p->d_inode;
+	printk ("**COWCOPY csc dst parent name:  %s\n",p->d_iname);
+	printk ("**COWCOPY csc src parent name:  %s\n",s->d_parent->d_iname);
+	//dget(s);
+	//printk ("**COWCOPY csc dget(d) \n");
+	//dget(d);
+	//printk ("**COWCOPY csc lock_parent(d) \n");
+	//dir = lock_parent(d);
+	//printk ("**COWCOPY csc vfs_link() \n");
+	ret = vfs_link(s,i,d); //create hardlink
+	
+	if (ret == 0){
+		printk ("**COWCOPY csc about to setxattr\n");
+		ret = vfs_setxattr(s,"cow","1",sizeof("cow"),XATTR_CREATE);
 	}
-	//increment link count for the inode
-	set_nlink(s->d_inode,s->d_inode->i_nlink+1);
 
+
+
+
+	/*printk ("**COWCOPY csc if(ret || !s-<d_inode)\n");
+	if (ret || !s->d_inode){
+		printk ("**COWCOPY csc mutex_unlock()\n");
+		mutex_unlock(&dir->d_inode->i_mutex);
+		printk ("**COWCOPY csc dput(dir)\n");
+		dput(dir);
+		printk ("**COWCOPY csc dput(s) \n");
+		dput(s);
+		printk ("**COWCOPY csc dput(d)\n");
+		dput(d);
+	}*/
+	//increment link count for the inode
+	//printk ("**COWCOPY csc set_nlink: \n");
+	//set_nlink(s->d_inode,s->d_inode->i_nlink+1);
 	return 0;
 }
 
@@ -111,8 +134,8 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 	ret = kern_path(ksource,LOOKUP_FOLLOW,&spath);	
 
-	printk ("**COWCOPY src kern_path returned %d**\n",ret);
-
+	if(ret < 0)
+		return 1;
 
 	if(checkFsType(spath.dentry,ksource) == 1)
 		return 1;
@@ -130,18 +153,13 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	printk ("**COWCOPY dest: %s**\n",kdest);
 
 
-	//kern_path(kdest,LOOKUP_FOLLOW,&dpath);
-
-	if (dpath.dentry == NULL)
-		printk("**COWCOPY %s: dpath.dentry is null**\n",kdest);
-	else
-		printk("**COWCOPY %s: dpath.dentry is not null**\n",kdest);
+	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);
 
 	//if(checkDevices(ksource,kdest) == 1)
 	//	return 1;
 
-	//if(createShallowCopy(spath.dentry,dpath.dentry) == 1)
-	//	return 1;
+	if(createShallowCopy(spath.dentry,dpath.dentry) == 1)
+		return 1;
 
 	return 0;
 
