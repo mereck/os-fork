@@ -74,10 +74,11 @@ test: build
 	@echo === Pushing application to the device ===
 	@$(ADB) push libs/$(APP_ARCH)/$(APP_NAME) /data/local/tmp
 	@$(ADB) shell chmod 777 /data/local/tmp/$(APP_NAME)
-	@echo === Running application ===
+	@echo === Running application ==
+	@$(ADB) shell rm /data/local/tmp/dest.txt
 	@$(ADB) shell /data/local/tmp/$(APP_NAME) /data/local/tmp/source.txt /data/local/tmp/dest.txt
-	@$(ADB) shell /data/local/tmp/$(APP_NAME) /NonExistant/source.txt /data/local/tmp/dest.txt
-	@$(ADB) shell /data/local/tmp/$(APP_NAME) /NonExistant/source.txt /Non/Existant/tmp/dest.txt
+#	@$(ADB) shell /data/local/tmp/$(APP_NAME) /NonExistant/source.txt /data/local/tmp/dest.txt
+#	@$(ADB) shell /data/local/tmp/$(APP_NAME) /NonExistant/source.txt /Non/Existant/tmp/dest.txt
 
 
 

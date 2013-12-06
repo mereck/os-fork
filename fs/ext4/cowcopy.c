@@ -41,36 +41,36 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 	if(S_ISDIR(spath.dentry->d_inode->i_mode)==1){
 		printk("**COWCOPY source file is a directory!**\n");
+		ret =-EPERM;
 		goto out;
 	}
-
-	if (ret == 2){ //src is a directory
-		ret = -EPERM;
-		goto out;
-	}
-	else if (ret == 1)
-		goto out;
 
 	// create shallow copy
 	destdentry = user_path_create(-1,dest,&dpath,0);
-
-	if (IS_ERR(destdentry))
-		goto out_dput;
-
 	printk ("**COWCOPY: upc returned dentry:%s\n**",destdentry->d_iname);
 
+	if (IS_ERR(destdentry))
+		goto out;
+
+
 	ret = -EXDEV;
-	if(spath.mnt != dpath.mnt)
+	if(spath.mnt != dpath.mnt){
+		printk ("**COWCOPY devices don't match \n**");
 		goto out_dput;
+	}
 
-	ret = mnt_want_write(dpath.mnt);
-	if(ret)
-		goto out_dput;
-
-	ret = security_path_link(spath.dentry,&dpath,destdentry);
+//	ret = mnt_want_write(dpath.mnt);
+//	printk ("**COWCOPY mnt_want_write returned %d\n**",ret);
 	
-	if(ret)
-		goto out_drop_write;
+//	if(ret)
+//		goto out_dput;
+
+//	ret = security_path_link(spath.dentry,&dpath,destdentry);
+//	printk ("**COWCOPY security_path_link returned %d\n**",ret);
+	
+	
+//	if(ret)
+//		goto out_drop_write;
 
 	ret = vfs_link(spath.dentry,dpath.dentry->d_inode, destdentry);
 	printk ("**COWCOPY vfs_link returned %d\n**",ret);
@@ -78,14 +78,15 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	ret = vfs_setxattr(spath.dentry,"cow","1",sizeof("cow"),XATTR_CREATE);
 	printk ("**COWCOPY vfs_setxattr returned %d\n**",ret);
 
-out_drop_write:
-	mnt_drop_write(dpath.mnt);
+//out_drop_write:
+//	mnt_drop_write(dpath.mnt);
 out_dput:
 	dput(destdentry);
 	mutex_unlock(&dpath.dentry->d_inode->i_mutex);
 	path_put(&dpath);
 out:
 	path_put(&spath);
+
 	return ret;
 }
 
