@@ -124,12 +124,21 @@ int createShallowCopy(struct dentry *s, struct dentry *d){
 asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest){
 
 	struct path spath, dpath;
-	int ret;
-	char ksource[100]; //TODO: we need to get this to work with paths that are larger than buffer size
-	char kdest[100];
+	int ret,i;
+	char ksource[400];
+	char kdest[400];
+	char *cur;
 	
+
+
+	if (strlen(src) > 400 || strlen(dest) > 400)
+		return -ENAMETOOLONG;
+
 	// process source path
-	ret = copy_from_user(&ksource, src, sizeof(ksource));
+	ret = strncpy_from_user(ksource, src, strlen(src));
+	if (!ret)
+		return -ENOENT;
+		
 	printk ("**COWCOPY src: %s\n",ksource);
 
 	ret = kern_path(ksource,LOOKUP_FOLLOW,&spath);	
@@ -149,11 +158,26 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 	// proces destination path
 	printk ("**COWCOPY about to copy dest into buffer**\n");
-	ret = copy_from_user(&kdest, dest, sizeof(kdest));
+	ret = strncpy_from_user(kdest, dest, strlen(dest));
+	if (!ret)
+		return -ENOENT;
+	
+
+
 	printk ("**COWCOPY dest: %s**\n",kdest);
 
+//	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);
 
-	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);
+//	if(ret == 0) // destination already exists
+//		return 1; 
+	
+	// get everything before the last slash in destination
+
+	cur = kdest;
+	i = 0;
+	while (*(cur++) != '\0')
+		printk("kdest[%d] = %c\n",i++,*cur);
+
 
 	//if(checkDevices(ksource,kdest) == 1)
 	//	return 1;
@@ -165,3 +189,5 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 
 }
+
+
