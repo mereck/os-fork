@@ -6,6 +6,8 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/xattr.h>
+#include <linux/mount.h>
+#include <linux/security.h>
 
 int checkFsType(struct dentry* d, char *buf){
 	const char *file_system_type;
@@ -54,10 +56,6 @@ int checkInodeType(struct inode* i){
 		printk("**COWCOPY source file inode is null. d.d_inode is null.**\n");
 		return 1;
 	}
-	//if (i->i_mode == NULL){
-	//	printk("**COWCOPY source file inode.i_mode is null.**\n");
-	//	return 1;
-	//}
 
 	if(S_ISDIR(i->i_mode)==1){
 		printk("**COWCOPY source file is a directory!**\n");
@@ -67,57 +65,6 @@ int checkInodeType(struct inode* i){
 	return 0;
 }
 
-int checkDevices(char *s, char *d){
-	return 0;
-}
-
-// locks parent dentry, taken from ecryptfs/inode.c
-/*static struct dentry *lock_parent(struct dentry *dentry){
-	struct dentry *dir;
-	dir = dget_parent(dentry);
-	mutex_lock_nested(&(dir->d_inode->i_mutex), I_MUTEX_PARENT);
-	return dir;
-}
-*/
-int createShallowCopy(struct dentry *s, struct dentry *d){
-	
-	int ret;
-	struct inode * i;
-	i = d->d_parent->d_inode;
-	printk ("**COWCOPY csc dst parent name:  %s\n",d->d_parent->d_iname);
-	printk ("**COWCOPY csc src parent name:  %s\n",s->d_parent->d_iname);
-	//dget(s);
-	//printk ("**COWCOPY csc dget(d) \n");
-	//dget(d);
-	//printk ("**COWCOPY csc lock_parent(d) \n");
-	//dir = lock_parent(d);
-	//printk ("**COWCOPY csc vfs_link() \n");
-	ret = vfs_link(s,i,d); //create hardlink
-	printk ("**COWCOPY vfs_link returned %d\n**",ret);
-
-	printk ("**COWCOPY csc about to setxattr\n");
-	ret = vfs_setxattr(s,"cow","1",sizeof("cow"),XATTR_CREATE);
-	printk ("**COWCOPY vfs_setxattr returned %d\n**",ret);
-
-
-
-
-	/*printk ("**COWCOPY csc if(ret || !s-<d_inode)\n");
-	if (ret || !s->d_inode){
-		printk ("**COWCOPY csc mutex_unlock()\n");
-		mutex_unlock(&dir->d_inode->i_mutex);
-		printk ("**COWCOPY csc dput(dir)\n");
-		dput(dir);
-		printk ("**COWCOPY csc dput(s) \n");
-		dput(s);
-		printk ("**COWCOPY csc dput(d)\n");
-		dput(d);
-	}*/
-	//increment link count for the inode
-	//printk ("**COWCOPY csc set_nlink: \n");
-	//set_nlink(s->d_inode,s->d_inode->i_nlink+1);
-	return 0;
-}
 
 asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest){
 
@@ -134,56 +81,55 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	ret = kern_path(ksource,LOOKUP_FOLLOW,&spath);	
 
 	if(ret < 0)
-		return 1;
+		return ret;
 
 	if(checkFsType(spath.dentry,ksource) == 1)
-		return 1;
+		return ret;
 
 	ret = checkInodeType(spath.dentry->d_inode);
 
 	if (ret == 2) //src is a directory
 		return -EPERM;
 	else if (ret == 1)
-		return 1;
+		return ret;
 
-	// proces destination path
-//	printk ("**COWCOPY about to copy dest into buffer**\n");
-//	ret = copy_from_user(kdest, dest, sizeof(kdest));
-
-//	printk ("**COWCOPY dest: %s**\n",kdest);
-
-//	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);	
-//	if(ret == 0) // destination already exists
-//		return 1; 
-	
 	destdentry = user_path_create(-1,dest,&dpath,0);
 
 
 	if (IS_ERR(destdentry))
-		return PTR_ERR(destdentry);
+		goto out;
 
 	printk ("**COWCOPY: upc returned dentry:%s\n**",destdentry->d_iname);
 
+	ret = -EXDEV;
+	if(spath.mnt != dpath.mnt)
+		goto out;
 
-	return 0;
+	ret = mnt_want_write(dpath.mnt);
+	if(ret)
+		goto out;
 
-	// get everything before the last slash in destination
-
-	//cur = kdest;
-	//i = 0;
-	//while (*(cur++) != '\0')
-	//	printk("kdest[%d] = %c\n",i++,*cur);
-
+	ret = security_path_link(spath.dentry,&dpath,destdentry);
 	
-	
+	if(ret)
+		goto out_drop_write;
 
-	//if(checkDevices(ksource,kdest) == 1)
-	//	return 1;
+	ret = vfs_link(spath.dentry,dpath.dentry->d_inode, destdentry);
+	printk ("**COWCOPY vfs_link returned %d\n**",ret);
+	printk ("**COWCOPY csc about to setxattr\n");
+	ret = vfs_setxattr(spath.dentry,"cow","1",sizeof("cow"),XATTR_CREATE);
+	printk ("**COWCOPY vfs_setxattr returned %d\n**",ret);
 
-	if(createShallowCopy(spath.dentry,destdentry) == 1)
-		return 1;
 
-	return 0;
+
+out_drop_write:
+	mnt_drop_write(dpath.mnt);
+out:
+	dput(destdentry);
+	mutex_unlock(&dpath.dentry->d_inode->i_mutex);
+	path_put(&dpath);
+	path_put(&spath);
+	return ret;
 
 
 }
