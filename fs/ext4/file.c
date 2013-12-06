@@ -166,6 +166,91 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	struct vfsmount *mnt = filp->f_path.mnt;
 	struct path path;
 	char buf[64], *cp;
+    int attributes = 0;
+    struct dentry * dentry ;
+    struct address_space *to_mapping = filp->f_mapping;
+    struct address_space *from_mapping = inode->i_mapping;
+    struct page * oldpage;
+    struct page * newpage;
+    struct nameidata *nd = NULL;
+    struct inode *parentInode;
+    struct dentry * parentDentry;
+    int index = 0;
+    int created;
+    int error;
+    void * pageBuffOld;
+    void * pageBuffNew;
+    path = filp->f_path;
+    dentry = (&path)->dentry;
+    vfs_getxattr( dentry , "cow" , (void *)&attributes , sizeof "cow");
+
+    if( attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
+
+        path = filp->f_path;
+        dentry = (&path)->dentry;
+
+
+        //Obtain the parent directory. A New inode will be created in this directory.
+        parentDentry  = dentry->d_parent;
+        parentInode = parentDentry->d_inode;
+
+        //Unlink. This is mainly to decrease the link count
+        vfs_unlink( parentInode, dentry);
+
+        
+        printk("COW file found %s/%s in! num pages %ld\n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages);
+
+        /*
+        *Create metadata (inode) to reference the new file.
+        *dentry.d_inode points to the old file. After vfs_create,
+        *it should point to the new copy of the file
+        *d_inode should be set to null before calling vfs_create.
+        */
+        dentry->d_inode = NULL;
+        dentry->d_alias.next = dentry->d_alias.prev;  //Empty the list of aliases
+        created = vfs_create( parentInode, filp->f_path.dentry, filp->f_mode, nd ); //nd - not sure where this comes from
+        if(!created)
+            return -ENOMEM;
+
+        /*
+        * Loop through the pages of old file and copy its pages into the newfile.
+        */
+         
+        do{
+            /*
+            * Get the page to transfer
+            * Disable page faults make sure copies are atomic.
+            */
+            pagefault_disable();
+            
+            //Get the page from old mapping
+            oldpage = find_get_page(from_mapping,index);
+            if(!oldpage)
+                return -ENOMEM;
+
+            //Allocate  new page
+            newpage = page_cache_alloc_cold(to_mapping);
+            if(!newpage)
+                return -ENOMEM;
+            
+            //Add the page to the new file's page cache
+            error = add_to_page_cache_lru(newpage, to_mapping, index, GFP_KERNEL);
+            if(error){
+                page_cache_release(newpage);
+                return -ENOMEM;
+            }
+
+            //Get the old page's data and copy it in
+            pageBuffOld = kmap(oldpage);        //Kmap returns a pointer to the buffer.
+            pageBuffNew = kmap(newpage);
+            memcpy(pageBuffNew,pageBuffOld,PAGE_CACHE_SIZE);
+
+            pagefault_enable();
+            index ++;
+        }while( index < from_mapping->nrpages);
+   
+    }
+    
 
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
 		     !(sb->s_flags & MS_RDONLY))) {
