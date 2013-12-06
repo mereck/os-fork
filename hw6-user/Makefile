@@ -75,7 +75,7 @@ test: build
 	@$(ADB) push libs/$(APP_ARCH)/$(APP_NAME) /data/local/tmp
 	@$(ADB) shell chmod 777 /data/local/tmp/$(APP_NAME)
 	@echo === Running application ===
-	@$(ADB) shell /data/local/tmp/$(APP_NAME)
+	@$(ADB) shell /data/local/tmp/$(APP_NAME) /data/local/tmp/source.txt /data/local/tmp/dest.txt
 
 uninstall:
 	@echo === Removing application ===

@@ -83,10 +83,8 @@ int createShallowCopy(struct dentry *s, struct dentry *d){
 	
 	int ret;
 	struct inode * i;
-	struct dentry * p;
-	p = d->d_parent;
-	i = p->d_inode;
-	printk ("**COWCOPY csc dst parent name:  %s\n",p->d_iname);
+	i = d->d_parent->d_inode;
+	printk ("**COWCOPY csc dst parent name:  %s\n",d->d_parent->d_iname);
 	printk ("**COWCOPY csc src parent name:  %s\n",s->d_parent->d_iname);
 	//dget(s);
 	//printk ("**COWCOPY csc dget(d) \n");
@@ -95,11 +93,11 @@ int createShallowCopy(struct dentry *s, struct dentry *d){
 	//dir = lock_parent(d);
 	//printk ("**COWCOPY csc vfs_link() \n");
 	ret = vfs_link(s,i,d); //create hardlink
-	
-	if (ret == 0){
-		printk ("**COWCOPY csc about to setxattr\n");
-		ret = vfs_setxattr(s,"cow","1",sizeof("cow"),XATTR_CREATE);
-	}
+	printk ("**COWCOPY vfs_link returned %d\n**",ret);
+
+	printk ("**COWCOPY csc about to setxattr\n");
+	ret = vfs_setxattr(s,"cow","1",sizeof("cow"),XATTR_CREATE);
+	printk ("**COWCOPY vfs_setxattr returned %d\n**",ret);
 
 
 
@@ -124,20 +122,12 @@ int createShallowCopy(struct dentry *s, struct dentry *d){
 asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest){
 
 	struct path spath, dpath;
-	int ret,i;
+	struct dentry * destdentry;
+	int ret;
 	char ksource[400];
-	char kdest[400];
-	char *cur;
 	
-
-
-	if (strlen(src) > 400 || strlen(dest) > 400)
-		return -ENAMETOOLONG;
-
 	// process source path
-	ret = strncpy_from_user(ksource, src, strlen(src));
-	if (!ret)
-		return -ENOENT;
+	ret = copy_from_user(ksource, src, sizeof(ksource));
 		
 	printk ("**COWCOPY src: %s\n",ksource);
 
@@ -157,32 +147,40 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 		return 1;
 
 	// proces destination path
-	printk ("**COWCOPY about to copy dest into buffer**\n");
-	ret = strncpy_from_user(kdest, dest, strlen(dest));
-	if (!ret)
-		return -ENOENT;
-	
+//	printk ("**COWCOPY about to copy dest into buffer**\n");
+//	ret = copy_from_user(kdest, dest, sizeof(kdest));
 
+//	printk ("**COWCOPY dest: %s**\n",kdest);
 
-	printk ("**COWCOPY dest: %s**\n",kdest);
-
-//	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);
-
+//	ret = kern_path(kdest,LOOKUP_PARENT,&dpath);	
 //	if(ret == 0) // destination already exists
 //		return 1; 
 	
+	destdentry = user_path_create(-1,dest,&dpath,0);
+
+
+	if (IS_ERR(destdentry))
+		return PTR_ERR(destdentry);
+
+	printk ("**COWCOPY: upc returned dentry:%s\n**",destdentry->d_iname);
+
+
+	return 0;
+
 	// get everything before the last slash in destination
 
-	cur = kdest;
-	i = 0;
-	while (*(cur++) != '\0')
-		printk("kdest[%d] = %c\n",i++,*cur);
+	//cur = kdest;
+	//i = 0;
+	//while (*(cur++) != '\0')
+	//	printk("kdest[%d] = %c\n",i++,*cur);
 
+	
+	
 
 	//if(checkDevices(ksource,kdest) == 1)
 	//	return 1;
 
-	if(createShallowCopy(spath.dentry,dpath.dentry) == 1)
+	if(createShallowCopy(spath.dentry,destdentry) == 1)
 		return 1;
 
 	return 0;
