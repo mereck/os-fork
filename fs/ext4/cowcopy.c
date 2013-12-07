@@ -5,9 +5,21 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
-#include <linux/xattr.h>
-#include <linux/mount.h>
 #include <linux/security.h>
+
+
+#include <linux/time.h>
+#include <linux/fs.h>
+#include <linux/jbd2.h>
+#include <linux/mount.h>
+#include <linux/path.h>
+#include <linux/quotaops.h>
+#include "ext4.h"
+#include "ext4_jbd2.h"
+#include "xattr.h"
+#include "acl.h"
+
+
 
 asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest){
 
@@ -18,8 +30,8 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	char *buf;
 	
 	ret = user_path_at(-1, src, LOOKUP_FOLLOW, &spath);
-	if(ret)
-		goto out;
+	if(ret || spath.dentry->d_inode == NULL)
+		return ret;
 
 	file_system_type = ((spath.dentry->d_sb)->s_type)->name;
 	buf = spath.dentry->d_iname;
@@ -74,9 +86,15 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 
 	ret = vfs_link(spath.dentry,dpath.dentry->d_inode, destdentry);
 	printk ("**COWCOPY vfs_link returned %d\n**",ret);
+	
 	printk ("**COWCOPY csc about to setxattr\n");
-	ret = vfs_setxattr(spath.dentry,"cow","1",sizeof("cow"),XATTR_CREATE);
-	printk ("**COWCOPY vfs_setxattr returned %d\n**",ret);
+	ret = ext4_xattr_set(spath.dentry->d_inode,EXT4_INODE_EXTENTS,"cow","1",sizeof("1"),0);
+	printk ("**COWCOPY vfs_setxattr on dst returned %d\n**",ret);
+
+//	ret = ext4_xattr_get(spath.dentry->d_inode,EXT4_XATTR_INDEX_TRUSTED,"cow",&buf,sizeof("cow"));
+//	printk ("**COWCOPY ext4_get_xattr on src returned %d buf is %s\n**",ret,buf);
+
+
 
 //out_drop_write:
 //	mnt_drop_write(dpath.mnt);
