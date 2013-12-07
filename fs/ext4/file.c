@@ -188,7 +188,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     xattr_ret = ext4_xattr_get( dentry->d_inode ,EXT4_INODE_EXTENTS, "cow" , attributes , sizeof( "1" ));
     //xattr_ret = 0;
     
-    printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
+  //  printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
     *attributes = 0;
 
     if( *attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
