@@ -166,7 +166,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 	struct vfsmount *mnt = filp->f_path.mnt;
 	struct path path;
 	char buf[64], *cp;
-    int attributes = 0;
+    char * attributes =(char*) kmalloc(sizeof( "1" ), GFP_KERNEL);
     struct dentry * dentry ;
     struct address_space *to_mapping = filp->f_mapping;
     struct address_space *from_mapping = inode->i_mapping;
@@ -178,13 +178,20 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     int index = 0;
     int created;
     int error;
+    int xattr_ret;
     void * pageBuffOld;
     void * pageBuffNew;
     path = filp->f_path;
     dentry = (&path)->dentry;
-    vfs_getxattr( dentry , "cow" , (void *)&attributes , sizeof "cow");
+    parentDentry  = dentry->d_parent;
+    parentInode = parentDentry->d_inode;
+    xattr_ret = ext4_xattr_get( dentry->d_inode ,EXT4_INODE_EXTENTS, "cow" , attributes , sizeof( "1" ));
+    //xattr_ret = 0;
+    
+    printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
+    *attributes = 0;
 
-    if( attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
+    if( *attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
 
         path = filp->f_path;
         dentry = (&path)->dentry;
@@ -251,7 +258,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
    
     }
     
-
+    kfree(attributes);
 	if (unlikely(!(sbi->s_mount_flags & EXT4_MF_MNTDIR_SAMPLED) &&
 		     !(sb->s_flags & MS_RDONLY))) {
 		sbi->s_mount_flags |= EXT4_MF_MNTDIR_SAMPLED;
