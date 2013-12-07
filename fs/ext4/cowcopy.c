@@ -28,8 +28,9 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	int ret;
 	const char *file_system_type;	
 	char *buf;
-	
-	ret = user_path_at(-1, src, LOOKUP_FOLLOW, &spath);
+
+	ret = user_path_at(AT_FDCWD, src, LOOKUP_FOLLOW, &spath);
+	printk("**COWCOPY: user_path_at src returned %d**\n",ret);
 	if(ret || spath.dentry->d_inode == NULL)
 		return ret;
 
@@ -58,8 +59,8 @@ asmlinkage int sys_ext4_cowcopy(const char __user *src, const char __user *dest)
 	}
 
 	// create shallow copy
-	destdentry = user_path_create(-1,dest,&dpath,0);
-	printk ("**COWCOPY: upc returned dentry:%s\n**",destdentry->d_iname);
+	destdentry = user_path_create(AT_FDCWD,dest,&dpath,0);
+	printk ("**COWCOPY: upc returned dentry:%s**\n",destdentry->d_iname);
 
 	if (IS_ERR(destdentry))
 		goto out;
