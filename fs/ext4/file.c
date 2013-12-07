@@ -188,13 +188,12 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     attributes[1] = '0'; 
     xattr_ret = ext4_xattr_get( dentry->d_inode ,EXT4_INODE_EXTENTS, "cow" , attributes , sizeof( "1" ));
     
-    //printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
-    *attributes = 0;
+    printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
 
     if( !(attributes[0] - '1') && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
 
         path = filp->f_path;
-        dentry = (&path)->dentry;
+        dentry = (&path)->dentry;   //dest
 
 
         //Obtain the parent directory. A New inode will be created in this directory.
@@ -217,10 +216,12 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         //dentry->d_alias.next = dentry->d_alias.prev;  //Empty the list of aliase
         list_del_init(&dentry->d_alias);
         created = vfs_create( parentInode, filp->f_path.dentry, filp->f_mode, nd ); //nd - not sure where this comes from
+        printk("after create\n");
         if(!created)
             return -ENOMEM;
-
         printk("created file\n");
+        //unlock(f_inode);
+
         /*
         * Loop through the pages of old file and copy its pages into the newfile.
         */
@@ -254,9 +255,18 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
             pageBuffNew = kmap(newpage);
             memcpy(pageBuffNew,pageBuffOld,PAGE_CACHE_SIZE);
 
+            //set_page_up_to_date(new);
+            //set_page_dirty()
+            //unlock(new);
+            //unlock(old);
+            //cache_release_page()
+            
+
             pagefault_enable();
             index ++;
         }
+        //count new ++
+        //count old --
    
     }
     
