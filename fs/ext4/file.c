@@ -185,13 +185,12 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
     dentry = (&path)->dentry;
     parentDentry  = dentry->d_parent;
     parentInode = parentDentry->d_inode;
+    attributes[1] = '0'; 
     xattr_ret = ext4_xattr_get( dentry->d_inode ,EXT4_INODE_EXTENTS, "cow" , attributes , sizeof( "1" ));
-    //xattr_ret = 0;
     
-    printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
-    *attributes = 0;
+    //printk("Opening %s/%s num pages %ld xattr_ret %d xattr %s \n" ,parentDentry->d_iname, dentry->d_iname, from_mapping->nrpages, xattr_ret, attributes);
 
-    if( *attributes && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
+    if( !(attributes[0] - '1') && (filp->f_mode & O_WRONLY  || filp->f_mode & O_RDWR)){
 
         path = filp->f_path;
         dentry = (&path)->dentry;
@@ -219,11 +218,12 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         if(!created)
             return -ENOMEM;
 
+        printk("created file\n");
         /*
         * Loop through the pages of old file and copy its pages into the newfile.
         */
          
-        do{
+        while( index < from_mapping->nrpages){
             /*
             * Get the page to transfer
             * Disable page faults make sure copies are atomic.
@@ -254,7 +254,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 
             pagefault_enable();
             index ++;
-        }while( index < from_mapping->nrpages);
+        }
    
     }
     
