@@ -18,6 +18,9 @@ int main(int argc, char *argv[]) {
     } else {
 	printf("Launched test_cowcopy with src:%s dest: %s\n",src,dest);
 	}
+	
+	fp = fopen("/data/local/tmp/dest.txt","w");
+
 
 	
 	//fp = fopen("/data/local/tmp/source.txt","r");
