@@ -214,7 +214,8 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
         *d_inode should be set to null before calling vfs_create.
         */
         dentry->d_inode = NULL;
-        dentry->d_alias.next = dentry->d_alias.prev;  //Empty the list of aliases
+        //dentry->d_alias.next = dentry->d_alias.prev;  //Empty the list of aliase
+        list_del_init(&dentry->d_alias);
         created = vfs_create( parentInode, filp->f_path.dentry, filp->f_mode, nd ); //nd - not sure where this comes from
         if(!created)
             return -ENOMEM;
